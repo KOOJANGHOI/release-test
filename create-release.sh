@@ -4,28 +4,6 @@ set -euo pipefail
 
 # ============================================================
 # Release Branch 생성 및 Ready-To-Merge PR 병합 스크립트
-#
-# Workflow
-#
-# 1. GitHub CLI 인증 상태 확인
-# 2. 작업 트리가 깨끗한지 확인
-# 3. develop 최신화
-# 4. release/YYYYMMDD 생성
-# 5. release 브랜치 원격 저장소 push
-# 6. ready-to-merge 라벨이 붙은 PR 조회
-# 7. 각 PR별 병합 여부 확인 (y/n)
-# 8. 선택된 PR의 커밋들을 release 브랜치에 Squash 병합 및 커밋 생성
-# 9. 병합 성공 시 해당 PR 즉시 Close (댓글 추가)
-# 10. release 브랜치 push
-# 11. release → develop PR 생성
-# 12. 성공 / 실패 / 스킵 목록 출력
-#
-# Requirements
-#
-# - git
-# - gh cli
-# - gh auth login 완료 상태
-#
 # ============================================================
 
 SUCCESS_PRS=()
@@ -187,14 +165,14 @@ while IFS="|" read -u 3 -r NUMBER TITLE BRANCH; do
   # release 브랜치로 이동
   git checkout "${RELEASE_BRANCH}"
 
-  # 1. Squash 병합 시도 (스테이징 영역에 변경사항만 얹어둠, 커밋은 안 됨)
+  # Squash 병합 시도
   if git merge --squash "origin/${BRANCH}"; then
     
-    # 2. Squash된 변경사항을 정식 커밋으로 생성 (병합 커밋이 아닌 일반 커밋으로 생성됨)
-    git commit -m "Merge PR #${NUMBER}: ${TITLE}"
+    # 깃허브 웹 Squash and Merge 수동 작동 방식과 100% 동일한 포맷으로 커밋 생성
+    git commit -m "${TITLE} (#${NUMBER})"
     
     SUCCESS_PRS+=("#${NUMBER} (${BRANCH})")
-    echo "[SUCCESS] 로컬 Squash 병합 및 커밋 완료"
+    echo "[SUCCESS] 로컬 Squash 병합 및 표준 커밋 완료"
 
     # 깃허브 PR 즉시 Close (원격 브랜치는 유지)
     echo "GitHub PR #${NUMBER} Close 처리 중..."
@@ -214,7 +192,6 @@ done 3<<< "$PRS"
 echo ""
 echo "[6/6] release 브랜치 push"
 
-# 성공한 병합이 있을 때만 푸시 진행하도록 안전장치 가동
 if [[ ${#SUCCESS_PRS[@]} -gt 0 ]]; then
   git push origin "${RELEASE_BRANCH}"
 else
