@@ -15,9 +15,10 @@ set -euo pipefail
 # 6. ready-to-merge 라벨이 붙은 PR 조회
 # 7. 각 PR별 병합 여부 확인 (y/n)
 # 8. 선택된 PR의 feature 브랜치를 release 브랜치에 Fast-Forward 병합
-# 9. release 브랜치 push
-# 10. release → develop PR 생성
-# 11. 성공 / 실패 / 스킵 목록 출력
+# 9. 병합 성공 시 해당 PR 즉시 Close (댓글 추가)
+# 10. release 브랜치 push
+# 11. release → develop PR 생성
+# 12. 성공 / 실패 / 스킵 목록 출력
 #
 # Requirements
 #
@@ -111,32 +112,4 @@ git checkout -b "${RELEASE_BRANCH}"
 # Step 7. release 브랜치 push
 #
 echo ""
-echo "[4/6] release 브랜치 push"
-
-git push -u origin "${RELEASE_BRANCH}"
-
-#
-# Step 8. ready-to-merge PR 조회
-#
-echo ""
-echo "[5/6] ready-to-merge PR 조회"
-
-PRS=$(
-  gh pr list \
-    --label "ready-to-merge" \
-    --state open \
-    --json number,title,headRefName \
-    --template '{{range .}}{{.number}}|{{.title}}|{{.headRefName}}{{"\n"}}{{end}}'
-)
-
-if [[ -z "$PRS" ]]; then
-  echo ""
-  echo "병합 대상 PR이 없습니다."
-
-  echo ""
-  echo "Release PR 생성"
-
-  RELEASE_PR_URL=$(gh pr create \
-    --base develop \
-    --head "${RELEASE_BRANCH}" \
-    --title "${RELEASE
+echo "[4/6] release 브랜치 push
