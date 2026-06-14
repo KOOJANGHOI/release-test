@@ -13,10 +13,11 @@ set -euo pipefail
 # 4. release/YYYYMMDD 생성
 # 5. release 브랜치 원격 저장소 push
 # 6. ready-to-merge 라벨이 붙은 PR 조회
-# 7. 사용자 확인 (Continue? y/n)
-# 8. 각 PR의 feature 브랜치를 release 브랜치에 병합 시도
+# 7. 각 PR별 병합 여부 확인 (y/n)
+# 8. 선택된 PR의 feature 브랜치를 release 브랜치에 병합
 # 9. release 브랜치 push
-# 10. 성공 / 실패 목록 출력
+# 10. release → develop PR 생성
+# 11. 성공 / 실패 / 스킵 목록 출력
 #
 # Requirements
 #
@@ -28,6 +29,9 @@ set -euo pipefail
 
 SUCCESS_PRS=()
 FAILED_PRS=()
+SKIPPED_PRS=()
+
+RELEASE_PR_URL=""
 
 echo "========================================="
 echo " Release Branch Automation"
@@ -64,6 +68,11 @@ fi
 echo ""
 read -rp "배포일을 입력하세요 (YYYYMMDD): " RELEASE_DATE
 
+if [[ ! "$RELEASE_DATE" =~ ^[0-9]{8}$ ]]; then
+  echo "[ERROR] YYYYMMDD 형식으로 입력해주세요."
+  exit 1
+fi
+
 RELEASE_BRANCH="release/${RELEASE_DATE}"
 
 echo ""
@@ -73,7 +82,7 @@ echo "Release Branch : ${RELEASE_BRANCH}"
 # Step 4. develop 최신화
 #
 echo ""
-echo "[1/5] develop 최신화"
+echo "[1/6] develop 최신화"
 
 git checkout develop
 git fetch origin
@@ -83,7 +92,7 @@ git reset --hard origin/develop
 # Step 5. release 브랜치 존재 여부 확인
 #
 echo ""
-echo "[2/5] release 브랜치 확인"
+echo "[2/6] release 브랜치 확인"
 
 if git ls-remote --heads origin "${RELEASE_BRANCH}" | grep -q "${RELEASE_BRANCH}"; then
   echo "[ERROR] 이미 존재하는 release 브랜치입니다."
@@ -94,7 +103,7 @@ fi
 # Step 6. release 브랜치 생성
 #
 echo ""
-echo "[3/5] release 브랜치 생성"
+echo "[3/6] release 브랜치 생성"
 
 git checkout -b "${RELEASE_BRANCH}"
 
@@ -102,7 +111,7 @@ git checkout -b "${RELEASE_BRANCH}"
 # Step 7. release 브랜치 push
 #
 echo ""
-echo "[4/5] release 브랜치 push"
+echo "[4/6] release 브랜치 push"
 
 git push -u origin "${RELEASE_BRANCH}"
 
@@ -110,7 +119,7 @@ git push -u origin "${RELEASE_BRANCH}"
 # Step 8. ready-to-merge PR 조회
 #
 echo ""
-echo "[5/5] ready-to-merge PR 조회"
+echo "[5/6] ready-to-merge PR 조회"
 
 PRS=$(
   gh pr list \
@@ -123,12 +132,21 @@ PRS=$(
 if [[ -z "$PRS" ]]; then
   echo ""
   echo "병합 대상 PR이 없습니다."
+
+  echo ""
+  echo "Release PR 생성"
+
+  RELEASE_PR_URL=$(gh pr create \
+    --base develop \
+    --head "${RELEASE_BRANCH}" \
+    --title "${RELEASE_BRANCH}" \
+    --body-file /dev/null)
+
+  echo "PR Created: ${RELEASE_PR_URL}"
+
   exit 0
 fi
 
-#
-# Continue 확인
-#
 echo ""
 echo "========================================="
 echo " Release Plan"
@@ -136,20 +154,10 @@ echo "========================================="
 echo ""
 echo "Release Branch : ${RELEASE_BRANCH}"
 echo ""
-echo "병합 대상 PR"
 
 while IFS='|' read -r NUMBER TITLE BRANCH; do
   echo "  - #${NUMBER} ${TITLE} [${BRANCH}]"
 done <<< "$PRS"
-
-echo ""
-read -rp "계속 진행하시겠습니까? (y/n): " ANSWER
-
-if [[ ! "$ANSWER" =~ ^[Yy]$ ]]; then
-  echo ""
-  echo "작업이 취소되었습니다."
-  exit 0
-fi
 
 #
 # Step 9. PR 병합
@@ -167,6 +175,17 @@ while IFS='|' read -r NUMBER TITLE BRANCH; do
   echo "Title   : ${TITLE}"
   echo "Branch  : ${BRANCH}"
   echo "-----------------------------------------"
+
+  read -rp "이 PR을 release에 병합하시겠습니까? (y/n): " ANSWER
+
+  if [[ ! "$ANSWER" =~ ^[Yy]$ ]]; then
+
+    echo "[SKIPPED]"
+
+    SKIPPED_PRS+=("#${NUMBER} (${BRANCH})")
+
+    continue
+  fi
 
   #
   # 최신 원격 정보 가져오기
@@ -203,9 +222,23 @@ done <<< "$PRS"
 # Step 10. release 브랜치 push
 #
 echo ""
-echo "Push Release Branch"
+echo "[6/6] release 브랜치 push"
 
 git push origin "${RELEASE_BRANCH}"
+
+#
+# Step 11. release -> develop PR 생성
+#
+echo ""
+echo "Create Release PR"
+
+RELEASE_PR_URL=$(gh pr create \
+  --base develop \
+  --head "${RELEASE_BRANCH}" \
+  --title "${RELEASE_BRANCH}" \
+  --body-file /dev/null)
+
+echo "PR Created: ${RELEASE_PR_URL}"
 
 #
 # Result
@@ -238,6 +271,22 @@ else
 fi
 
 echo ""
+echo "[SKIPPED]"
+
+if [[ ${#SKIPPED_PRS[@]} -eq 0 ]]; then
+  echo "  (none)"
+else
+  for item in "${SKIPPED_PRS[@]}"; do
+    echo "  - ${item}"
+  done
+fi
+
+echo ""
 echo "Release Branch : ${RELEASE_BRANCH}"
+
+echo ""
+echo "Release PR"
+echo "  ${RELEASE_PR_URL}"
+
 echo ""
 echo "Done."
