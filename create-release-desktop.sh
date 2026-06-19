@@ -11,6 +11,9 @@ set -euo pipefail
 #
 # 이 스크립트는 "desktop"으로 시작하는 브랜치만 병합합니다.
 # (예: desktop/YYYYMMDD/개발자명)
+#
+# Release Branch 형식: release/desktop/{version}
+# (예: release/desktop/1.0.83)
 # ============================================================
 
 SUCCESS_PRS=()
@@ -59,17 +62,17 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 #
-# Step 3. 배포일 입력
+# Step 3. 버전 입력
 #
 echo ""
-read -rp "배포일을 입력하세요 (YYYYMMDD): " RELEASE_DATE
+read -rp "배포 버전을 입력하세요 (예: 1.0.83): " VERSION
 
-if [[ ! "$RELEASE_DATE" =~ ^[0-9]{8}$ ]]; then
-  echo "[ERROR] YYYYMMDD 형식으로 입력해주세요."
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "[ERROR] 버전 형식이 올바르지 않습니다. (예: 1.0.83)"
   exit 1
 fi
 
-RELEASE_BRANCH="release/${RELEASE_DATE}"
+RELEASE_BRANCH="release/desktop/${VERSION}"
 
 echo ""
 echo "Release Branch : ${RELEASE_BRANCH}"
