@@ -49,14 +49,15 @@ for i in $(seq 1 $PR_COUNT); do
   # 브랜치 생성
   git checkout -b "${BRANCH_NAME}"
 
-  # test.txt 파일 수정
-  echo "" >> test.txt
-  echo "Desktop Test PR #${i} - ${DEVELOPER}" >> test.txt
-  echo "Desktop feature implementation by ${DEVELOPER}" >> test.txt
+# 각 PR마다 다른 파일 생성/수정 (충돌 방지)
+  TEST_FILE="test-${TIMESTAMP}-${i}.txt"
+  echo "Test PR #${i} - ${TIMESTAMP}" > "${TEST_FILE}"
+  echo "This is a test commit for PR automation testing" >> "${TEST_FILE}"
+  echo "Branch: ${BRANCH_NAME}" >> "${TEST_FILE}"
 
   # 커밋
-  git add test.txt
-  git commit -m "Desktop: Test PR #${i} by ${DEVELOPER}"
+  git add "${TEST_FILE}"
+  git commit -m "Test PR #${i}: Add ${TEST_FILE}"
 
   # 원격 푸시
   git push -u origin "${BRANCH_NAME}"
